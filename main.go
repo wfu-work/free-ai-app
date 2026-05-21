@@ -17,8 +17,8 @@ func init() {
 }
 
 func main() {
-	backend.Start()
-	apiMiddleware, err := NewAPIMiddleware()
+	go backend.Start()
+	apiMiddleware, err := backend.NewAPIMiddleware()
 
 	app := application.New(application.Options{
 		Name:        "FreeAi",
@@ -30,10 +30,13 @@ func main() {
 		},
 		Server: application.ServerOptions{
 			Host: "127.0.0.1",
-			Port: 18787,
+			Port: 8787,
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
+		},
+		OnShutdown: func() {
+
 		},
 	})
 
@@ -54,7 +57,7 @@ func main() {
 	})
 
 	// Run the application. This blocks until the application has been exited.
-	err := app.Run()
+	err = app.Run()
 
 	// If an error occurred while running the application, log it and exit.
 	if err != nil {

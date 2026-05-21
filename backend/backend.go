@@ -1,11 +1,17 @@
 package backend
 
 import (
-	"github.com/go-git/go-git/v5/utils/sync"
-	"github.com/stretchr/testify/http"
+	"context"
+	"log"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wfu-work/free-ai-go/inits"
-	"modernc.org/libc/time"
 )
 
 const (
@@ -18,8 +24,8 @@ func Start() {
 	inits.Init()
 }
 
-func NewAPIMiddleware(target string) (application.Middleware, error) {
-	proxyURL, err := url.Parse(target)
+func NewAPIMiddleware() (application.Middleware, error) {
+	proxyURL, err := url.Parse(backendBaseURL)
 	if err != nil {
 		return nil, err
 	}
