@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/wailsapp/wails/v3 v3.0.0-alpha.95
-	github.com/wfu-work/free-ai-go v0.0.0-20260521125522-73822794846b
+	github.com/wfu-work/free-ai-go v0.0.0-20260522023741-65f8ae2d285a
 )
 
 require (
