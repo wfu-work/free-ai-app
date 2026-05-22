@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	_ "embed"
 	"freeai-app/backend"
@@ -12,9 +13,20 @@ import (
 //go:embed all:frontend/dist/freeai-web/browser
 var assets embed.FS
 
+const (
+	desktopServerHost = "127.0.0.1"
+	desktopServerPort = 34115
+)
+
 func main() {
-	go backend.Start()
+	if err := backend.StartAndWait(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+
 	apiMiddleware, err := backend.NewAPIMiddleware()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	app := application.New(application.Options{
 		Name:        "FreeAi",
@@ -25,8 +37,8 @@ func main() {
 			Middleware: application.ChainMiddleware(apiMiddleware),
 		},
 		Server: application.ServerOptions{
-			Host: "127.0.0.1",
-			Port: 8787,
+			Host: desktopServerHost,
+			Port: desktopServerPort,
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
@@ -50,7 +62,7 @@ func main() {
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 		BackgroundColour: application.NewRGB(27, 38, 54),
-		URL:              "http://127.0.0.1:8787",
+		URL:              "/",
 	})
 
 	setupSystemTray(app, window)
