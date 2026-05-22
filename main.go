@@ -43,6 +43,7 @@ func main() {
 		Width:              1280,
 		Height:             860,
 		UseApplicationMenu: true,
+		DevToolsEnabled:    true,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,

@@ -18,6 +18,7 @@ var quitting atomic.Bool
 const (
 	shortcutShow   = "CmdOrCtrl+Shift+F"
 	shortcutReload = "CmdOrCtrl+R"
+	shortcutDebug  = "CmdOrCtrl+Alt+I"
 	shortcutQuit   = "CmdOrCtrl+Q"
 )
 
@@ -36,6 +37,9 @@ func setupApplicationMenu(app *application.App) {
 	})
 	appMenu.Add("Reload").SetAccelerator(shortcutReload).OnClick(func(ctx *application.Context) {
 		app.Window.Current().Reload()
+	})
+	appMenu.Add("Debug").SetAccelerator(shortcutDebug).OnClick(func(ctx *application.Context) {
+		openDebugConsole(app.Window.Current())
 	})
 	appMenu.AddSeparator()
 	appMenu.Add("Quit").SetAccelerator(shortcutQuit).OnClick(func(ctx *application.Context) {
@@ -66,8 +70,11 @@ func setupSystemTray(app *application.App, window *application.WebviewWindow) {
 	trayMenu.Add(menuLabel("重新加载", shortcutReload)).SetAccelerator(shortcutReload).OnClick(func(ctx *application.Context) {
 		window.Reload()
 	})
+	trayMenu.Add(menuLabel("打开调试", shortcutDebug)).SetAccelerator(shortcutDebug).OnClick(func(ctx *application.Context) {
+		openDebugConsole(window)
+	})
 	trayMenu.AddSeparator()
-	trayMenu.Add("打开后保持后台运行").SetEnabled(false)
+	trayMenu.Add("保持后台运行").SetEnabled(false)
 	trayMenu.Add(menuLabel("退出 FreeAi", shortcutQuit)).SetAccelerator(shortcutQuit).OnClick(func(ctx *application.Context) {
 		quitting.Store(true)
 		app.Quit()
@@ -103,6 +110,15 @@ func showMainWindow(app *application.App) {
 func showWindow(window *application.WebviewWindow) {
 	window.Show().Focus()
 	window.Center()
+}
+
+func openDebugConsole(window application.Window) {
+	if window == nil {
+		return
+	}
+	window.Show().Focus()
+	window.Center()
+	window.OpenDevTools()
 }
 
 func menuLabel(label string, shortcut string) string {

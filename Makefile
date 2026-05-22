@@ -16,7 +16,7 @@ DMG_STAGING ?= bin/dmg-staging
 TASK ?= $(shell if command -v task >/dev/null 2>&1; then printf 'task'; elif command -v wails3 >/dev/null 2>&1; then printf 'wails3 task'; fi)
 HOST_OS := $(shell go env GOOS 2>/dev/null || uname -s | tr '[:upper:]' '[:lower:]')
 
-TASK_VARS = ARCH=$(ARCH)
+TASK_VARS = ARCH=$(ARCH) EXTRA_TAGS=devtools
 TASK_PLATFORM_VARS = $(TASK_VARS) FORMAT=$(FORMAT) INSTALL_SCOPE=$(INSTALL_SCOPE)
 
 .DEFAULT_GOAL := help
