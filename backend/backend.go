@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	backendBaseURL      = "http://127.0.0.1:8787"
-	backendHealthURL    = backendBaseURL + "/api/health"
+	BackendBaseURL      = "http://127.0.0.1:8787"
+	backendHealthURL    = BackendBaseURL + "/api/health"
 	backendReadyTimeout = 30 * time.Second
 	proxyErrorLogGap    = 5 * time.Second
 )
@@ -52,7 +52,7 @@ func StartAndWait(ctx context.Context) error {
 }
 
 func NewAPIMiddleware() (application.Middleware, error) {
-	proxyURL, err := url.Parse(backendBaseURL)
+	proxyURL, err := url.Parse(BackendBaseURL)
 	if err != nil {
 		return nil, err
 	}
