@@ -31,16 +31,18 @@ jobs:
           repository: ${{ env.FRONTEND_REPOSITORY }}
           path: free-ai-web
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version-file: free-ai-web/.nvmrc
           cache: pnpm
           cache-dependency-path: free-ai-web/pnpm-lock.yaml
-
-      - name: Enable pnpm
-        shell: bash
-        run: corepack enable
 
       - name: Install frontend dependencies
         shell: bash
