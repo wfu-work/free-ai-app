@@ -4,7 +4,9 @@
         <key>CFBundlePackageType</key>
             <string>APPL</string>
         <key>CFBundleName</key>
-            <string>My Product</string>
+            <string>FreeAi</string>
+        <key>CFBundleDisplayName</key>
+            <string>FreeAi</string>
         <key>CFBundleExecutable</key>
             <string>free-ai-app</string>
         <key>CFBundleIdentifier</key>

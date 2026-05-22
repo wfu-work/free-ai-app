@@ -2,6 +2,8 @@ version: '3'
 
 vars:
   APP_NAME: "free-ai-app"
+  APP_DISPLAY_NAME: "FreeAi"
+  APP_DEV_BUNDLE_NAME: "FreeAi"
   BIN_DIR: "bin"
   PACKAGE_MANAGER:
   VITE_PORT:
@@ -33,7 +35,18 @@ tasks:
   dev:
     summary: Runs the application in development mode
     cmds:
-      - wails3 dev
+      - task: "{{OS}}:build"
+        vars:
+          DEV: "true"
+      - task: "{{OS}}:run"
+
+  dev:dist:
+    summary: Runs the application in development mode using embedded frontend assets
+    cmds:
+      - task: "{{OS}}:build"
+        vars:
+          DEV: "true"
+      - task: "{{OS}}:run"
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
