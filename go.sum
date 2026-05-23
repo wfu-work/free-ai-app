@@ -364,8 +364,8 @@ github.com/wailsapp/wails/v3 v3.0.0-alpha.95 h1:Rve8djRSldn6381q2l8gw8XEnzPX/4So
 github.com/wailsapp/wails/v3 v3.0.0-alpha.95/go.mod h1:3euiK0wb6vnXvxiHysRYYbukCa060bLSsfrvN7sZg4k=
 github.com/wailsapp/wails/webview2 v1.0.24 h1:uULnjCSaRfMlU84mS3kjLgPsRosEOIusVK1nFOHZHzs=
 github.com/wailsapp/wails/webview2 v1.0.24/go.mod h1:sdf+s0nAdxlzVWf9SCxC15XaxnQPJeY+uU1Ucn3jHQM=
-github.com/wfu-work/free-ai-go v0.0.0-20260522023741-65f8ae2d285a h1:NxWjbZ8Qr/AJDGGMEkSwbdIjP6dGv7QF9KZ1Bc9gQQs=
-github.com/wfu-work/free-ai-go v0.0.0-20260522023741-65f8ae2d285a/go.mod h1:zqyh3I5hGHM6z8SlGgfrOxzqytwOG+z7qLcf7fRwyJ0=
+github.com/wfu-work/free-ai-go v0.0.0-20260523115831-a092c59e793c h1:e4xP/5cGT3ts2G2O9QCEMlXWPP+BdczHCnJEGDdhOFI=
+github.com/wfu-work/free-ai-go v0.0.0-20260523115831-a092c59e793c/go.mod h1:zqyh3I5hGHM6z8SlGgfrOxzqytwOG+z7qLcf7fRwyJ0=
 github.com/wfu-work/nav-common-go-lib v0.0.0-20260410115433-425e7da57c9c h1:JsJ0z9uGecNPc5M9KztXdH5L5UpPNZPgLJDR+6d/xNQ=
 github.com/wfu-work/nav-common-go-lib v0.0.0-20260410115433-425e7da57c9c/go.mod h1:9x6rishobXg+nUK74vzCskVCMu9WsNQpuvwjHC5AUUQ=
 github.com/wfu-work/proxy-api-lib v0.0.0-20260520132833-30a82d34f7e4 h1:pb+EBaR7BQOHY1Ck7nuGWV9bSoaVZMpQdSFmaIBy0y0=
