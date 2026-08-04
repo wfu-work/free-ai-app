@@ -4,15 +4,18 @@ tasks:
   go:mod:tidy:
     summary: Runs `go mod tidy`
     internal: true
+    run: once
     cmds:
       - go mod tidy
 
   install:frontend:deps:
     summary: Install frontend dependencies
+    run: once
     cmds:
+      - task: install:frontend:deps:{{.PACKAGE_MANAGER}}
 
   install:frontend:deps:npm:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     sources:
       - package.json
       - package-lock.json
@@ -22,9 +25,10 @@ tasks:
       - sh: npm version
         msg: "Looks like npm isn't installed. Npm is part of the Node installer: https://nodejs.org/en/download/"
     cmds:
+      - npm install
 
   install:frontend:deps:bun:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     sources:
       - package.json
       - bun.lock
@@ -35,9 +39,10 @@ tasks:
       - sh: bun --version
         msg: "bun not found"
     cmds:
+      - bun install
 
   install:frontend:deps:pnpm:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     sources:
       - package.json
       - pnpm-lock.yaml
@@ -47,9 +52,12 @@ tasks:
       - sh: pnpm --version
         msg: "pnpm not found"
     cmds:
+      - pnpm install --frozen-lockfile
+    env:
+      CI: "true"
 
   install:frontend:deps:yarn:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     sources:
       - package.json
       - yarn.lock
@@ -59,92 +67,62 @@ tasks:
       - sh: yarn --version
         msg: "yarn not found"
     cmds:
+      - yarn install
 
   build:frontend:
-    label: build:frontend (DEV={{.DEV}} RUNNER={{.PACKAGE_MANAGER}})
-    summary: Build the frontend project
-    dir: frontend
-    sources:
-      - "**/*"
-      - exclude: node_modules/**/*
-    generates:
-      - dist/**/*
+    label: build:frontend (FreeAI Angular production)
+    summary: Builds free-ai-web and synchronises its browser bundle into the desktop app.
+    run: once
     deps:
       - task: install:frontend:deps
-      - task: generate:bindings
-        vars:
-          BUILD_FLAGS:
-            ref: .BUILD_FLAGS
     cmds:
       - task: frontend:run
         vars:
-          SCRIPT: '{{if eq .DEV "true"}}build:dev{{else}}build{{end}}'
-    env:
-      PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
+          SCRIPT: build
+      - task: sync:frontend
+
+  sync:frontend:
+    summary: Synchronises the latest Angular browser dist into the Wails embed directory.
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - go run ./build/scripts/syncfrontend -source "{{.FRONTEND_DIR}}/dist/freeai-web/browser" -target ./frontend/dist
 
   frontend:run:
     summary: Run a frontend script with selected runner
     cmds:
+      - task: frontend:run:{{.PACKAGE_MANAGER}}
+        vars:
+          SCRIPT: "{{.SCRIPT}}"
     vars:
+      SCRIPT: "{{.SCRIPT}}"
 
   frontend:run:npm:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
       - npm run {{.SCRIPT}} -q
     vars:
       SCRIPT: "{{.SCRIPT}}"
 
   frontend:run:yarn:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
+      - yarn {{.SCRIPT}}
     vars:
+      SCRIPT: "{{.SCRIPT}}"
 
   frontend:run:pnpm:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
+      - pnpm run {{.SCRIPT}}
     vars:
+      SCRIPT: "{{.SCRIPT}}"
 
   frontend:run:bun:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
+      - bun run {{.SCRIPT}}
     vars:
-
-  frontend:vendor:puppertino:
-    summary: Fetches Puppertino CSS into frontend/public for consistent mobile styling
-    sources:
-      - frontend/public/puppertino/puppertino.css
-    generates:
-      - frontend/public/puppertino/puppertino.css
-    cmds:
-      - |
-        set -euo pipefail
-        mkdir -p frontend/public/puppertino
-        # If bundled Puppertino exists, prefer it. Otherwise, try to fetch, but don't fail build on error.
-        if [ ! -f frontend/public/puppertino/puppertino.css ]; then
-          echo "No bundled Puppertino found. Attempting to fetch from GitHub..."
-          if curl -fsSL https://raw.githubusercontent.com/codedgar/Puppertino/main/dist/css/full.css -o frontend/public/puppertino/puppertino.css; then
-            curl -fsSL https://raw.githubusercontent.com/codedgar/Puppertino/main/LICENSE -o frontend/public/puppertino/LICENSE || true
-            echo "Puppertino CSS downloaded to frontend/public/puppertino/puppertino.css"
-          else
-            echo "Warning: Could not fetch Puppertino CSS. Proceeding without download since template may bundle it."
-          fi
-        else
-          echo "Using bundled Puppertino at frontend/public/puppertino/puppertino.css"
-        fi
-        # Ensure index.html includes Puppertino CSS and button classes
-        INDEX_HTML=frontend/index.html
-        if [ -f "$INDEX_HTML" ]; then
-          if ! grep -q 'href="/puppertino/puppertino.css"' "$INDEX_HTML"; then
-            # Insert Puppertino link tag after style.css link
-            awk '
-              /href="\/style.css"\/?/ && !x { print; print "    <link rel=\"stylesheet\" href=\"/puppertino/puppertino.css\"/>"; x=1; next }1
-            ' "$INDEX_HTML" > "$INDEX_HTML.tmp" && mv "$INDEX_HTML.tmp" "$INDEX_HTML"
-          fi
-          # Replace default .btn with Puppertino primary button classes if present
-          sed -E -i'' 's/class=\"btn\"/class=\"p-btn p-prim-col\"/g' "$INDEX_HTML" || true
-        fi
-
-
+      SCRIPT: "{{.SCRIPT}}"
 
   generate:bindings:
     label: generate:bindings (BUILD_FLAGS={{.BUILD_FLAGS}})
@@ -161,7 +139,7 @@ tasks:
     generates:
       - frontend/bindings/**/*
     cmds:
-      - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true
+      - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true -ts -i
 
   generate:icons:
     summary: Generates Windows `.ico` and Mac `.icns` from an image; on macOS, `-iconcomposerinput appicon.icon -macassetdir darwin` also produces `Assets.car` from a `.icon` file (skipped on other platforms).
@@ -178,23 +156,29 @@ tasks:
   dev:frontend:
     summary: Runs the frontend in development mode
     deps:
+      - task: install:frontend:deps
     cmds:
+      - task: frontend:dev:{{.PACKAGE_MANAGER}}
 
   frontend:dev:npm:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
+      - npm start -- --port {{.VITE_PORT}}
 
   frontend:dev:yarn:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
+      - yarn start --port {{.VITE_PORT}}
 
   frontend:dev:pnpm:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
+      - pnpm start -- --port {{.VITE_PORT}}
 
   frontend:dev:bun:
-    dir: frontend
+    dir: "{{.FRONTEND_DIR}}"
     cmds:
+      - bun run start -- --port {{.VITE_PORT}}
 
   update:build-assets:
     summary: Updates the build assets

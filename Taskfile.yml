@@ -5,8 +5,10 @@ vars:
   APP_DISPLAY_NAME: "FreeAi"
   APP_DEV_BUNDLE_NAME: "FreeAi"
   BIN_DIR: "bin"
-  PACKAGE_MANAGER:
-  VITE_PORT:
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "pnpm"}}'
+  FRONTEND_DIR: '{{.ROOT_DIR}}/../free-ai-web'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 4200}}'
+  GOOS: '{{.GOOS | default OS}}'
 
 includes:
   common: ./build/Taskfile.yml
@@ -20,33 +22,30 @@ tasks:
   build:
     summary: Builds the application
     cmds:
-      - task: "{{OS}}:build"
+      - task: "{{.GOOS}}:build"
 
   package:
     summary: Packages a production build of the application
     cmds:
-      - task: "{{OS}}:package"
+      - task: "{{.GOOS}}:package"
 
   run:
     summary: Runs the application
     cmds:
-      - task: "{{OS}}:run"
+      - task: "{{.GOOS}}:run"
 
   dev:
     summary: Runs the application in development mode
     cmds:
-      - task: "{{OS}}:build"
-        vars:
-          DEV: "true"
-      - task: "{{OS}}:run"
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
   dev:dist:
     summary: Runs the application in development mode using embedded frontend assets
     cmds:
-      - task: "{{OS}}:build"
+      - task: "{{.GOOS}}:build"
         vars:
           DEV: "true"
-      - task: "{{OS}}:run"
+      - task: "{{.GOOS}}:run"
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)

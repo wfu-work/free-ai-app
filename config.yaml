@@ -1,0 +1,38 @@
+freeai:
+    cleanup-log-retention-days: 30
+    cooldown-seconds: 300
+    default-upstream-base-url: https://api.openai.com/v1
+    log-prompt-content: false
+    max-retries: 1
+    proxy-prefix: /v1
+    quota-refresh-seconds: 180
+    request-timeout-seconds: 120
+    routing-strategy: weighted_round_robin
+    secret-key-file: /Volumes/wfu-sdd/works/xiaoxi/code/recodex/free-ai-app/data/master.key
+    stream-idle-timeout-seconds: 60
+    upstream-proxy-enabled: false
+    upstream-proxy-url: ""
+jwt:
+    buffer-time: 1d
+    expires-time: 7d
+    issuer: FreeAiGo
+    signing-key: change-me
+local:
+    cache-path: /Volumes/wfu-sdd/works/xiaoxi/code/recodex/free-ai-app/data/cache.json
+    ip2geo-path: /Volumes/wfu-sdd/works/xiaoxi/code/recodex/free-ai-app/data/ip2geo
+    oss-path: /Volumes/wfu-sdd/works/xiaoxi/code/recodex/free-ai-app/data/oss
+    proxy-oss-path: /oss
+sqlite:
+    db-name: freeai
+    log-mode: silent
+    path: /Volumes/wfu-sdd/works/xiaoxi/code/recodex/free-ai-app/data
+system:
+    addr: 8787
+    app-name: FreeAiGo
+    db-type: sqlite
+    router-prefix: /api
+zap:
+    director: /Volumes/wfu-sdd/works/xiaoxi/code/recodex/free-ai-app/logback
+    level: info
+    prefix: '[FreeAiGo]'
+    retention-day: 7
