@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="FreeAI tray logo">
+  <g fill="none" stroke="#000000" stroke-width="104">
+    <rect x="346" y="126" width="332" height="772" rx="166" transform="rotate(45 512 512)"/>
+    <rect x="346" y="126" width="332" height="772" rx="166" transform="rotate(-45 512 512)"/>
+  </g>
+</svg>

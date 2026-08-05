@@ -47,6 +47,10 @@ func syncDirectory(source, target string) error {
 	if err = os.CopyFS(targetPath, os.DirFS(sourcePath)); err != nil {
 		return fmt.Errorf("复制前端资源: %w", err)
 	}
+	// 保留空目录占位文件，确保全新克隆在同步前也能通过 go:embed 编译检查。
+	if err = os.WriteFile(filepath.Join(targetPath, ".keep"), nil, 0644); err != nil {
+		return fmt.Errorf("写入前端目录占位文件: %w", err)
+	}
 	return nil
 }
 

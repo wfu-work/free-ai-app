@@ -1,35 +1,117 @@
-name: Build Release Packages
+name: Build and Release Desktop Packages
 
 on:
   push:
     tags:
-      - "*"
+      - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "用于测试构建的版本号，例如 1.2.0 或 1.2.0-beta.1"
+        required: true
+        default: "0.0.0-dev"
+        type: string
+      frontend_ref:
+        description: "需要打包的 free-ai-web 分支、标签或提交 SHA；留空使用工作流内固定版本"
+        required: false
+        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: desktop-release-${{ github.ref }}-${{ inputs.version || 'tag' }}
   cancel-in-progress: false
 
 env:
   APP_DISPLAY_NAME: FreeAi
   APP_NAME: free-ai-app
   FRONTEND_REPOSITORY: wfu-work/free-ai-web
-  WAILS_VERSION: v3.0.0-alpha.95
+  # 正式发布默认固定前端提交，避免 main 后续变化导致同一标签无法复现。
+  FRONTEND_REF: 6ecf9c259922ebe967b184797c06a0e7cbb99464
+  WAILS_VERSION: v3.0.0-beta.3
 
 jobs:
+  metadata:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_ref: ${{ steps.metadata.outputs.frontend_ref }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+      publish: ${{ steps.metadata.outputs.publish }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+      version: ${{ steps.metadata.outputs.version }}
+
+    steps:
+      - name: Resolve and validate version
+        id: metadata
+        shell: bash
+        env:
+          DISPATCH_FRONTEND_REF: ${{ inputs.frontend_ref }}
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            release_tag="${GITHUB_REF_NAME}"
+            version="${release_tag#v}"
+            publish="true"
+          else
+            version="${DISPATCH_VERSION#v}"
+            release_tag="v${version}"
+            publish="false"
+          fi
+
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?(\+[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Invalid version: ${version}. Expected SemVer such as 1.2.0 or 1.2.0-beta.1." >&2
+            exit 1
+          fi
+
+          frontend_ref="${DISPATCH_FRONTEND_REF:-${FRONTEND_REF}}"
+          prerelease="false"
+          if [[ "${version}" == *-* ]]; then
+            prerelease="true"
+          fi
+
+          echo "frontend_ref=${frontend_ref}" >> "${GITHUB_OUTPUT}"
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
+          echo "publish=${publish}" >> "${GITHUB_OUTPUT}"
+          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write build summary
+        shell: bash
+        run: |
+          {
+            echo "## FreeAI desktop build"
+            echo
+            echo "- Version: \`${{ steps.metadata.outputs.version }}\`"
+            echo "- Frontend ref: \`${{ steps.metadata.outputs.frontend_ref }}\`"
+            echo "- Publish release: \`${{ steps.metadata.outputs.publish }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
   frontend:
     name: Build frontend assets
+    needs: metadata
     runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
 
     steps:
       - name: Checkout frontend
         uses: actions/checkout@v4
         with:
           repository: ${{ env.FRONTEND_REPOSITORY }}
+          ref: ${{ needs.metadata.outputs.frontend_ref }}
           path: free-ai-web
+          token: ${{ secrets.FREE_AI_WEB_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Record frontend revision
+        id: revision
+        shell: bash
+        working-directory: free-ai-web
+        run: echo "commit=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -52,7 +134,7 @@ jobs:
       - name: Build frontend
         shell: bash
         working-directory: free-ai-web
-        run: pnpm build
+        run: pnpm run build
 
       - name: Check frontend output
         shell: bash
@@ -65,10 +147,13 @@ jobs:
           name: frontend-dist
           path: free-ai-web/dist/freeai-web
           if-no-files-found: error
+          retention-days: 3
 
   macos:
     name: macOS ${{ matrix.arch }}
-    needs: frontend
+    needs:
+      - metadata
+      - frontend
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -82,16 +167,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Download frontend assets
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/freeai-web
-
-      - name: Set release version
-        shell: bash
-        run: echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          path: ../free-ai-web/dist/freeai-web
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -99,9 +182,17 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Add Go tools to PATH
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
+
       - name: Install Wails CLI
         shell: bash
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}
+
+      - name: Apply package version
+        shell: bash
+        run: go run ./build/scripts/setversion -version "${{ needs.metadata.outputs.version }}"
 
       - name: Build DMG
         shell: bash
@@ -109,10 +200,10 @@ jobs:
           set -euo pipefail
           make dmg \
             ARCH="${{ matrix.arch }}" \
-            VERSION="${RELEASE_VERSION}" \
-            DMG_NAME="${APP_DISPLAY_NAME}-${RELEASE_VERSION}-macos-${{ matrix.arch }}.dmg"
+            VERSION="${{ needs.metadata.outputs.version }}" \
+            DMG_NAME="${APP_DISPLAY_NAME}-${{ needs.metadata.outputs.version }}-macos-${{ matrix.arch }}.dmg"
           mkdir -p dist
-          cp "bin/${APP_DISPLAY_NAME}-${RELEASE_VERSION}-macos-${{ matrix.arch }}.dmg" dist/
+          cp "bin/${APP_DISPLAY_NAME}-${{ needs.metadata.outputs.version }}-macos-${{ matrix.arch }}.dmg" dist/
 
       - name: Upload macOS package
         uses: actions/upload-artifact@v4
@@ -120,10 +211,13 @@ jobs:
           name: package-macos-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 14
 
   windows:
     name: Windows ${{ matrix.arch }}
-    needs: frontend
+    needs:
+      - metadata
+      - frontend
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -135,24 +229,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Download frontend assets
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/freeai-web
-
-      - name: Set release version
-        shell: pwsh
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          path: ../free-ai-web/dist/freeai-web
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Add Go tools to PATH
+        shell: pwsh
+        run: |
+          $goBin = Join-Path (go env GOPATH) "bin"
+          $goBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Wails CLI
         shell: pwsh
@@ -171,6 +267,10 @@ jobs:
           }
           $nsisPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Apply package version
+        shell: pwsh
+        run: go run ./build/scripts/setversion -version "${{ needs.metadata.outputs.version }}"
+
       - name: Build NSIS installer
         shell: pwsh
         run: |
@@ -181,7 +281,7 @@ jobs:
           if (-not (Test-Path $installer)) {
             throw "Expected installer was not created: $installer"
           }
-          Copy-Item $installer "dist/${env:APP_DISPLAY_NAME}-${env:RELEASE_VERSION}-windows-${{ matrix.arch }}-setup.exe"
+          Copy-Item $installer "dist/${env:APP_DISPLAY_NAME}-${{ needs.metadata.outputs.version }}-windows-${{ matrix.arch }}-setup.exe"
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
@@ -189,10 +289,13 @@ jobs:
           name: package-windows-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 14
 
   linux:
     name: Linux ${{ matrix.arch }}
-    needs: frontend
+    needs:
+      - metadata
+      - frontend
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -204,23 +307,22 @@ jobs:
             runner: ubuntu-24.04-arm
 
     env:
-      GOARCH: ${{ matrix.arch }}
+      APPIMAGE_EXTRACT_AND_RUN: "1"
       GIT_COMMITTER_NAME: github-actions[bot]
       GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+      GOARCH: ${{ matrix.arch }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Download frontend assets
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/freeai-web
-
-      - name: Set release version
-        shell: bash
-        run: echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          path: ../free-ai-web/dist/freeai-web
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -228,19 +330,28 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Add Go tools to PATH
+        shell: bash
+        run: echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
+
       - name: Install Linux build dependencies
         shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
-            pkg-config \
             libgtk-4-dev \
-            libwebkitgtk-6.0-dev
+            libwebkitgtk-6.0-dev \
+            pkg-config \
+            wget
 
       - name: Install Wails CLI
         shell: bash
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}
+
+      - name: Apply package version
+        shell: bash
+        run: go run ./build/scripts/setversion -version "${{ needs.metadata.outputs.version }}"
 
       - name: Build Linux packages
         shell: bash
@@ -248,14 +359,21 @@ jobs:
           set -euo pipefail
           wails3 task linux:package ARCH="${{ matrix.arch }}"
           mkdir -p dist
+
+          package_count=0
           for file in bin/*; do
-            case "$file" in
-              *.AppImage|*.deb|*.rpm|*.pkg.tar.*)
-                cp "$file" "dist/${APP_DISPLAY_NAME}-${RELEASE_VERSION}-linux-${{ matrix.arch }}-$(basename "$file")"
-                ;;
+            case "${file}" in
+              *.AppImage) suffix="AppImage" ;;
+              *.deb) suffix="deb" ;;
+              *.rpm) suffix="rpm" ;;
+              *.pkg.tar.*) suffix="pkg.tar.zst" ;;
+              *) continue ;;
             esac
+            cp "${file}" "dist/${APP_DISPLAY_NAME}-${{ needs.metadata.outputs.version }}-linux-${{ matrix.arch }}.${suffix}"
+            package_count=$((package_count + 1))
           done
-          test "$(find dist -type f | wc -l)" -gt 0
+
+          test "${package_count}" -eq 4
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
@@ -263,17 +381,27 @@ jobs:
           name: package-linux-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 14
 
   release:
     name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/')
+    if: needs.metadata.outputs.publish == 'true'
     needs:
+      - metadata
+      - frontend
       - macos
       - windows
       - linux
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
+      - name: Checkout release files
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
@@ -281,15 +409,34 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Generate checksums and release notes
+        shell: bash
+        env:
+          FRONTEND_COMMIT: ${{ needs.frontend.outputs.commit }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum FreeAi-* > SHA256SUMS.txt
+          cd ..
+          sed \
+            -e "s/{{VERSION}}/${RELEASE_TAG}/g" \
+            -e "s/{{FRONTEND_SHA}}/${FRONTEND_COMMIT}/g" \
+            .github/RELEASE_NOTES.md > release-notes.md
+
       - name: List release assets
         shell: bash
-        run: find release-assets -type f -maxdepth 1 -print | sort
+        run: find release-assets -maxdepth 1 -type f -print | sort
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ env.APP_DISPLAY_NAME }} ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          name: ${{ env.APP_DISPLAY_NAME }} ${{ needs.metadata.outputs.release_tag }}
+          tag_name: ${{ needs.metadata.outputs.release_tag }}
+          body_path: release-notes.md
+          generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ needs.metadata.outputs.prerelease }}
+          make_latest: ${{ needs.metadata.outputs.prerelease == 'false' }}
+          fail_on_unmatched_files: true
           files: release-assets/*

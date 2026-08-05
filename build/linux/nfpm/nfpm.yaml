@@ -6,13 +6,13 @@
 name: "free-ai-app"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.1.0"
+version: "1.0.0"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A free-ai-app application"
-vendor: "My Company"
-homepage: "https://wails.io"
+description: "本地官方 AI 账号池与 OpenAI 兼容网关"
+vendor: "XiaoXi"
+homepage: "https://github.com/wfu-work/free-ai-app"
 license: "MIT"
 release: "1"
 

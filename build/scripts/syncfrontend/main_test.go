@@ -36,4 +36,7 @@ func TestSyncDirectory(t *testing.T) {
 	if content, err := os.ReadFile(filepath.Join(target, "assets", "logo.svg")); err != nil || string(content) != "logo" {
 		t.Fatalf("新资源未被复制: content=%q err=%v", content, err)
 	}
+	if _, err := os.Stat(filepath.Join(target, ".keep")); err != nil {
+		t.Fatalf("前端目录占位文件未保留: %v", err)
+	}
 }

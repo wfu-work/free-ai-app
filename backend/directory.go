@@ -33,10 +33,11 @@ func ResolveDataDirectory() (string, error) {
 			return workingDirectory, nil
 		}
 	}
-	dataDirectory, err := freeaiutils.AppDataDir()
+	configPath, err := freeaiutils.DefaultConfigPath()
 	if err != nil {
-		return "", fmt.Errorf("解析 FreeAI 数据目录: %w", err)
+		return "", fmt.Errorf("解析 FreeAI 默认配置路径: %w", err)
 	}
+	dataDirectory := filepath.Dir(configPath)
 	if err = os.MkdirAll(dataDirectory, 0700); err != nil {
 		return "", fmt.Errorf("创建 FreeAI 数据目录: %w", err)
 	}

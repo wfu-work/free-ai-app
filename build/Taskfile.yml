@@ -70,15 +70,10 @@ tasks:
       - yarn install
 
   build:frontend:
-    label: build:frontend (FreeAI Angular production)
-    summary: Builds free-ai-web and synchronises its browser bundle into the desktop app.
+    label: build:frontend (prebuilt FreeAI dist)
+    summary: Synchronises the prebuilt free-ai-web browser bundle into the desktop app.
     run: once
-    deps:
-      - task: install:frontend:deps
     cmds:
-      - task: frontend:run
-        vars:
-          SCRIPT: build
       - task: sync:frontend
 
   sync:frontend:
